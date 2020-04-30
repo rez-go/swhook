@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"strings"
 
 	flag "github.com/spf13/pflag"
 	"gopkg.in/go-playground/webhooks.v5/github"
@@ -114,34 +113,22 @@ func (action *StackDeploymentAction) pullRepo() error {
 }
 
 func (action *StackDeploymentAction) deploy() error {
+	stackName := action.stackName
 	composeFilename := action.composeFilename
 	if composeFilename == "" {
-		if action.stackName != "" {
-			suffixes := []string{".yml", ".yaml", "-stack.yml", "-stack.yaml"}
-			for _, sfx := range suffixes {
-				fname := action.stackName + sfx
-				if fileExists(fname) {
-					composeFilename = fname
-					break
-				}
+		suffixes := []string{".yml", ".yaml", "-stack.yml", "-stack.yaml"}
+		for _, sfx := range suffixes {
+			fname := stackName + sfx
+			if fileExists(fname) {
+				composeFilename = fname
+				break
 			}
-		} else {
+		}
+		if composeFilename == "" {
 			composeFilename = "main-stack.yaml"
 		}
 	}
-	stackName := action.stackName
-	if stackName == "" {
-		stackName = composeFilename
-		nameParts := strings.Split(stackName, ".")
-		if len(nameParts) > 1 {
-			for _, s := range nameParts {
-				if s != "" {
-					stackName = s
-					break
-				}
-			}
-		}
-	}
+	fmt.Printf("Deploying for stack %q with compose file %q ...\n", stackName, composeFilename)
 	cmd := exec.Command("docker", "stack", "deploy", "-c", composeFilename, stackName)
 	cmdEnv := os.Environ()[:]
 	cmd.Env = cmdEnv
