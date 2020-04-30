@@ -1,0 +1,25 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      
+    - name: Build the artifacts
+      run: make linux-amd64
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: swhook-linux-amd64
+        path: build/swhook-linux-amd64
