@@ -1,6 +1,6 @@
 # swhook
 
-A simple tool to automate deployment update of a Docker Swarm stack by
+A simple tool to automate deployment updates of a Docker Swarm stack by
 utilizing webhook.
 
 **WARNING**: Experimental project.
