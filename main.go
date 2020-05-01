@@ -13,12 +13,14 @@ import (
 )
 
 const (
-	servePath = "/stack-deployments"
+	servePathDefault = "/stack-deployments"
 )
 
 var (
-	stackName = ""
-	workDir   = ""
+	stackName      = ""
+	workDir        = ""
+	listenHostPort = ":8080"
+	servePath      = servePathDefault
 )
 
 func main() {
@@ -26,6 +28,8 @@ func main() {
 	flag.StringVar(&workDir, "workdir", "",
 		"If provided, swhook will use this directory to checkout the repository. "+
 			"By default, temporary directory will be used.")
+	flag.StringVar(&listenHostPort, "listen", listenHostPort,
+		"Where should the service listen to.")
 
 	flag.Parse()
 
@@ -65,7 +69,7 @@ func main() {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 
-	http.ListenAndServe(":2002", nil)
+	http.ListenAndServe(listenHostPort, nil)
 }
 
 func NewStackDeploymentAction(
