@@ -25,7 +25,7 @@ func main() {
 	flag.Parse()
 
 	if stackName == "" {
-		fmt.Printf("The option --stack is required\n")
+		fmt.Printf("Option --stack is required\n")
 		os.Exit(-1)
 	}
 
@@ -42,17 +42,22 @@ func main() {
 
 		switch eventData := payload.(type) {
 		case github.PushPayload:
-			fmt.Printf("Starting deploy for stack %q revision %s ...\n", stackName, eventData.After)
+			fmt.Printf("Preparing new deployment for stack %q revision %s ...\n", stackName, eventData.After)
 			repoURL := eventData.Repository.SSHURL
-			action := NewStackDeploymentAction(stackName, repoURL, eventData.After)
-			err = action.Run()
-			if err != nil {
-				panic(err)
-			}
-			fmt.Printf("Deploy completed for stack %q revision %s\n", stackName, eventData.After)
+			revision := eventData.After
+			action := NewStackDeploymentAction(stackName, repoURL, revision)
+			go func() {
+				err = action.Run()
+				if err != nil {
+					panic(err)
+				}
+				fmt.Printf("Deployment completed for stack %q revision %s\n", stackName, revision)
+			}()
+			w.WriteHeader(http.StatusOK)
+			return
 		}
 
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusInternalServerError)
 	})
 
 	http.ListenAndServe(":2002", nil)
@@ -132,7 +137,8 @@ func (action *StackDeploymentAction) deploy() error {
 	}
 	fmt.Printf("Excuting deployment for stack %q revision %s with compose file %q ...\n",
 		stackName, action.composeRevision, composeFilename)
-	cmd := exec.Command("docker", "stack", "deploy", "--prune", "-c", composeFilename, stackName)
+	cmd := exec.Command("docker", "stack", "deploy",
+		"--prune", "-c", composeFilename, stackName)
 	cmdEnv := os.Environ()[:]
 	cmd.Env = cmdEnv
 	cmd.Dir = action.workDir
