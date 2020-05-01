@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	flag "github.com/spf13/pflag"
 	"gopkg.in/go-playground/webhooks.v5/github"
@@ -114,7 +115,12 @@ func (action *StackDeploymentAction) Run() error {
 func (action *StackDeploymentAction) pull() error {
 	cmdEnv := os.Environ()[:]
 
-	if !action.workDirSpecified {
+	workDirExists := false
+	if action.workDirSpecified {
+		workDirExists = dirExists(filepath.Join(action.workDir, ".git"))
+	}
+
+	if !workDirExists {
 		cmd := exec.Command("git", "clone", action.composeRepoURL, action.workDir)
 		cmd.Env = cmdEnv
 		outBytes, err := cmd.CombinedOutput()
@@ -177,4 +183,12 @@ func fileExists(filename string) bool {
 		return false
 	}
 	return !info.IsDir()
+}
+
+func dirExists(dirname string) bool {
+	info, err := os.Stat(dirname)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return info.IsDir()
 }
