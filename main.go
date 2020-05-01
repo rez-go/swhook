@@ -64,6 +64,9 @@ func NewStackDeploymentService(
 		log.Fatalf("GitHub hook handler instantiation: %v", err)
 	}
 
+	log.Printf("Starting service for stack %q, with working directory %q ...",
+		stackName, workDir)
+
 	return &StackDeploymentService{
 		githubHook: ghHook,
 		stackName:  stackName,
