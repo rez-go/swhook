@@ -14,19 +14,13 @@ import (
 	"gopkg.in/go-playground/webhooks.v5/github"
 )
 
-const (
-	servePathDefault = "/stack-deployments"
-)
+func main() {
+	stackName := ""
+	workDir := ""
+	listenHostPort := ":8080"
+	servePath := "/stack-deployments"
+	secret := ""
 
-var (
-	stackName      = ""
-	workDir        = ""
-	listenHostPort = ":8080"
-	servePath      = servePathDefault
-	secret         = ""
-)
-
-func init() {
 	flag.StringVar(&stackName, "stack", "",
 		"The name of the stack.")
 	flag.StringVar(&workDir, "workdir", "",
@@ -37,12 +31,10 @@ func init() {
 	flag.StringVar(&secret, "secret", "",
 		"The secret used to validate the "+
 			"requests comming to the hook.")
-}
 
-func main() {
 	flag.Parse()
 
-	svc, err := NewStackDeploymentService()
+	svc, err := NewStackDeploymentService(stackName, workDir, secret)
 	if err != nil {
 		log.Fatalf("Unable to initialize service: %v", err)
 	}
@@ -53,7 +45,11 @@ func main() {
 }
 
 // NewStackDeploymentService returns a new instance of StackDeploymentService.
-func NewStackDeploymentService() (*StackDeploymentService, error) {
+func NewStackDeploymentService(
+	stackName string,
+	workDir string,
+	secret string,
+) (*StackDeploymentService, error) {
 	if stackName == "" {
 		return nil, errors.New("stack name must not be empty")
 	}
@@ -68,12 +64,17 @@ func NewStackDeploymentService() (*StackDeploymentService, error) {
 		log.Fatalf("GitHub hook handler instantiation: %v", err)
 	}
 
-	return &StackDeploymentService{githubHook: ghHook}, nil
+	return &StackDeploymentService{
+		githubHook: ghHook,
+		stackName:  stackName,
+	}, nil
 }
 
 // StackDeploymentService represents a service for a stack deployment.
 type StackDeploymentService struct {
 	githubHook *github.Webhook
+	stackName  string
+	workDir    string
 }
 
 func (svc *StackDeploymentService) postStackDeployments(w http.ResponseWriter, r *http.Request) {
@@ -103,23 +104,23 @@ func (svc *StackDeploymentService) postStackDeployments(w http.ResponseWriter, r
 
 func (svc *StackDeploymentService) updateDeployment(repoURL string, revision string) error {
 	log.Printf("stack %q rev %s: Preparing new deployment...",
-		stackName, revision[:12])
-	action := NewStackDeploymentAction(stackName, workDir, repoURL, revision)
+		svc.stackName, revision[:12])
+	action := NewStackDeploymentAction(svc.stackName, svc.workDir, repoURL, revision)
 	go func() {
 		defer func() {
 			if recData := recover(); recData != nil {
 				log.Printf("stack %q rev %s: Deployment update caused panic: %v",
-					stackName, revision[:12], recData)
+					svc.stackName, revision[:12], recData)
 			}
 		}()
 		err := action.Run()
 		if err != nil {
 			log.Printf("stack %q rev %s: Deployment update failed: %v",
-				stackName, revision[:12], err)
+				svc.stackName, revision[:12], err)
 			return
 		}
 		log.Printf("stack %q rev %s: Deployment update complete.",
-			stackName, revision[:12])
+			svc.stackName, revision[:12])
 	}()
 	return nil
 }
