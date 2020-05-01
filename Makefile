@@ -1,7 +1,7 @@
 
 GOLANG_IMAGE ?= golang:1.14
 
-.PHONY: all fmt linux-amd64
+.PHONY: all deps-up fmt linux-amd64
 
 all: linux-amd64
 
@@ -24,3 +24,11 @@ linux-amd64:
 		--entrypoint go \
 		$(GOLANG_IMAGE) build -v -o build/swhook-linux-amd64 \
 		.
+
+# Update all dependencies
+deps-up:
+	@echo "Updating all dependencies..."
+	@docker run --rm \
+		-v $(CURDIR):/workspace \
+		--workdir /workspace \
+		$(GOLANG_IMAGE) /bin/sh -c "go get -u all && go mod tidy"
