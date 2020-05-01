@@ -157,7 +157,7 @@ func (action *StackDeploymentAction) Run() error {
 	if !action.workDirSpecified {
 		action.workDir, err = ioutil.TempDir("", "swhook_")
 		if err != nil {
-			return err
+			return fmt.Errorf("temp dir: %w", err)
 		}
 		defer os.RemoveAll(action.workDir)
 	}
@@ -220,7 +220,7 @@ func (action *StackDeploymentAction) deploy() error {
 			}
 		}
 		if composeFilename == "" {
-			composeFilename = "main-stack.yaml"
+			composeFilename = stackName + "-stack.yaml"
 		}
 	}
 
