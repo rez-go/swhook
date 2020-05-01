@@ -17,10 +17,14 @@ const (
 
 var (
 	stackName = ""
+	workDir   = ""
 )
 
 func main() {
-	flag.StringVar(&stackName, "stack", "", "help message for flagname")
+	flag.StringVar(&stackName, "stack", "", "The name of the stack.")
+	flag.StringVar(&workDir, "workdir", "",
+		"If provided, swhook will use this directory to checkout the repository. "+
+			"By default, temporary directory will be used.")
 
 	flag.Parse()
 
@@ -45,7 +49,7 @@ func main() {
 			fmt.Printf("Preparing new deployment for stack %q revision %s ...\n", stackName, eventData.After)
 			repoURL := eventData.Repository.SSHURL
 			revision := eventData.After
-			action := NewStackDeploymentAction(stackName, repoURL, revision)
+			action := NewStackDeploymentAction(stackName, workDir, repoURL, revision)
 			go func() {
 				err = action.Run()
 				if err != nil {
@@ -65,33 +69,39 @@ func main() {
 
 func NewStackDeploymentAction(
 	stackName string,
+	workDir string,
 	composeRepoURL string,
 	composeRevision string,
 ) *StackDeploymentAction {
 	return &StackDeploymentAction{
-		stackName:       stackName,
-		composeRepoURL:  composeRepoURL,
-		composeRevision: composeRevision,
+		stackName:        stackName,
+		workDir:          workDir,
+		workDirSpecified: workDir != "",
+		composeRepoURL:   composeRepoURL,
+		composeRevision:  composeRevision,
 	}
 }
 
 type StackDeploymentAction struct {
-	stackName       string
-	composeRepoURL  string
-	composeRevision string
-	composeFilename string
-	workDir         string
+	stackName        string
+	workDir          string
+	workDirSpecified bool
+	composeRepoURL   string
+	composeRevision  string
+	composeFilename  string
 }
 
 func (action *StackDeploymentAction) Run() error {
 	var err error
-	action.workDir, err = ioutil.TempDir("", "swhook_")
-	if err != nil {
-		return err
+	if !action.workDirSpecified {
+		action.workDir, err = ioutil.TempDir("", "swhook_")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(action.workDir)
 	}
-	defer os.RemoveAll(action.workDir)
 
-	err = action.pullRepo()
+	err = action.pull()
 	if err != nil {
 		return err
 	}
@@ -101,18 +111,30 @@ func (action *StackDeploymentAction) Run() error {
 	return err
 }
 
-func (action *StackDeploymentAction) pullRepo() error {
+func (action *StackDeploymentAction) pull() error {
 	cmdEnv := os.Environ()[:]
-	cmd := exec.Command("git", "clone", action.composeRepoURL, action.workDir)
-	cmd.Env = cmdEnv
-	outBytes, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git clone: %w\n%s", err, outBytes)
+
+	if !action.workDirSpecified {
+		cmd := exec.Command("git", "clone", action.composeRepoURL, action.workDir)
+		cmd.Env = cmdEnv
+		outBytes, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("git clone: %w\n%s", err, outBytes)
+		}
+	} else {
+		cmd := exec.Command("git", "pull")
+		cmd.Env = cmdEnv
+		cmd.Dir = action.workDir
+		outBytes, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("git pull: %w\n%s", err, outBytes)
+		}
 	}
-	cmd = exec.Command("git", "reset", "--hard", action.composeRevision)
+
+	cmd := exec.Command("git", "reset", "--hard", action.composeRevision)
 	cmd.Env = cmdEnv
 	cmd.Dir = action.workDir
-	outBytes, err = cmd.CombinedOutput()
+	outBytes, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git reset: %w\n%s", err, outBytes)
 	}

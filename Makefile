@@ -1,7 +1,9 @@
 
 GOLANG_IMAGE ?= golang:1.14
 
-.PHONY: fmt linux-amd64
+.PHONY: all fmt linux-amd64
+
+all: linux-amd64
 
 fmt:
 	@echo "Formatting files..."
