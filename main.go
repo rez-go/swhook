@@ -42,12 +42,14 @@ func main() {
 
 		switch eventData := payload.(type) {
 		case github.PushPayload:
+			fmt.Printf("Starting deploy for stack %q revision %s ...\n", stackName, eventData.After)
 			repoURL := eventData.Repository.SSHURL
 			action := NewStackDeploymentAction(stackName, repoURL, eventData.After)
 			err = action.Run()
 			if err != nil {
 				panic(err)
 			}
+			fmt.Printf("Deploy completed for stack %q revision %s\n", stackName, eventData.After)
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -128,8 +130,9 @@ func (action *StackDeploymentAction) deploy() error {
 			composeFilename = "main-stack.yaml"
 		}
 	}
-	fmt.Printf("Deploying for stack %q with compose file %q ...\n", stackName, composeFilename)
-	cmd := exec.Command("docker", "stack", "deploy", "-c", composeFilename, stackName)
+	fmt.Printf("Excuting deployment for stack %q revision %s with compose file %q ...\n",
+		stackName, action.composeRevision, composeFilename)
+	cmd := exec.Command("docker", "stack", "deploy", "--prune", "-c", composeFilename, stackName)
 	cmdEnv := os.Environ()[:]
 	cmd.Env = cmdEnv
 	cmd.Dir = action.workDir
