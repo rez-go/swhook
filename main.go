@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -25,7 +26,7 @@ var (
 	secret         = ""
 )
 
-func main() {
+func init() {
 	flag.StringVar(&stackName, "stack", "",
 		"The name of the stack.")
 	flag.StringVar(&workDir, "workdir", "",
@@ -36,12 +37,25 @@ func main() {
 	flag.StringVar(&secret, "secret", "",
 		"The secret used to validate the "+
 			"requests comming to the hook.")
+}
 
+func main() {
 	flag.Parse()
 
+	svc, err := NewStackDeploymentService()
+	if err != nil {
+		log.Fatalf("Unable to initialize service: %v", err)
+	}
+
+	http.HandleFunc(servePath, svc.postStackDeployments)
+
+	http.ListenAndServe(listenHostPort, nil)
+}
+
+// NewStackDeploymentService returns a new instance of StackDeploymentService.
+func NewStackDeploymentService() (*StackDeploymentService, error) {
 	if stackName == "" {
-		log.Printf("Option --stack is required")
-		os.Exit(-1)
+		return nil, errors.New("stack name must not be empty")
 	}
 
 	opts := []github.Option{}
@@ -49,45 +63,68 @@ func main() {
 		opts = append(opts, github.Options.Secret(secret))
 	}
 
-	hook, err := github.New(opts...)
+	ghHook, err := github.New(opts...)
 	if err != nil {
 		log.Fatalf("GitHub hook handler instantiation: %v", err)
 	}
 
-	http.HandleFunc(servePath, func(w http.ResponseWriter, r *http.Request) {
-		payload, err := hook.Parse(r, github.PushEvent)
-		if err != nil {
-			if err == github.ErrEventNotFound {
-				w.WriteHeader(http.StatusOK)
-				return
-			}
-		}
+	return &StackDeploymentService{githubHook: ghHook}, nil
+}
 
-		switch eventData := payload.(type) {
-		case github.PushPayload:
-			revision := eventData.After
-			log.Printf("stack %q rev %s: Preparing new deployment...",
-				stackName, revision[:12])
-			repoURL := eventData.Repository.SSHURL
-			action := NewStackDeploymentAction(stackName, workDir, repoURL, revision)
-			go func() {
-				err = action.Run()
-				if err != nil {
-					panic(err)
-				}
-				log.Printf("stack %q rev %s: Deployment update complete.",
-					stackName, revision[:12])
-			}()
+// StackDeploymentService represents a service for a stack deployment.
+type StackDeploymentService struct {
+	githubHook *github.Webhook
+}
+
+func (svc *StackDeploymentService) postStackDeployments(w http.ResponseWriter, r *http.Request) {
+	payload, err := svc.githubHook.Parse(r, github.PushEvent)
+	if err != nil {
+		if err == github.ErrEventNotFound {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
+	}
 
-		w.WriteHeader(http.StatusInternalServerError)
-	})
+	switch eventData := payload.(type) {
+	case github.PushPayload:
+		revision := eventData.After
+		repoURL := eventData.Repository.SSHURL
+		err := svc.updateDeployment(repoURL, revision)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 
-	http.ListenAndServe(listenHostPort, nil)
+	w.WriteHeader(http.StatusInternalServerError)
 }
 
+func (svc *StackDeploymentService) updateDeployment(repoURL string, revision string) error {
+	log.Printf("stack %q rev %s: Preparing new deployment...",
+		stackName, revision[:12])
+	action := NewStackDeploymentAction(stackName, workDir, repoURL, revision)
+	go func() {
+		defer func() {
+			if recData := recover(); recData != nil {
+				log.Printf("stack %q rev %s: Deployment update caused panic: %v",
+					stackName, revision[:12], recData)
+			}
+		}()
+		err := action.Run()
+		if err != nil {
+			log.Printf("stack %q rev %s: Deployment update failed: %v",
+				stackName, revision[:12], err)
+			return
+		}
+		log.Printf("stack %q rev %s: Deployment update complete.",
+			stackName, revision[:12])
+	}()
+	return nil
+}
+
+// NewStackDeploymentAction creates an action for updating the deployment.
 func NewStackDeploymentAction(
 	stackName string,
 	workDir string,
@@ -103,6 +140,7 @@ func NewStackDeploymentAction(
 	}
 }
 
+// StackDeploymentAction holds information required for an update.
 type StackDeploymentAction struct {
 	stackName        string
 	workDir          string
@@ -112,6 +150,7 @@ type StackDeploymentAction struct {
 	composeFilename  string
 }
 
+// Run runs the action.
 func (action *StackDeploymentAction) Run() error {
 	var err error
 	if !action.workDirSpecified {
