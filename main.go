@@ -70,6 +70,7 @@ func NewStackDeploymentService(
 	return &StackDeploymentService{
 		githubHook: ghHook,
 		stackName:  stackName,
+		workDir:    workDir,
 	}, nil
 }
 
