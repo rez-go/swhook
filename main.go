@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -21,24 +22,37 @@ var (
 	workDir        = ""
 	listenHostPort = ":8080"
 	servePath      = servePathDefault
+	secret         = ""
 )
 
 func main() {
-	flag.StringVar(&stackName, "stack", "", "The name of the stack.")
+	flag.StringVar(&stackName, "stack", "",
+		"The name of the stack.")
 	flag.StringVar(&workDir, "workdir", "",
-		"If provided, swhook will use this directory to checkout the repository. "+
-			"By default, temporary directory will be used.")
+		"If provided, swhook will use this directory to checkout the "+
+			"repository. By default, temporary directory will be used.")
 	flag.StringVar(&listenHostPort, "listen", listenHostPort,
 		"Where should the service listen to.")
+	flag.StringVar(&secret, "secret", "",
+		"The secret used to validate the "+
+			"requests comming to the hook.")
 
 	flag.Parse()
 
 	if stackName == "" {
-		fmt.Printf("Option --stack is required\n")
+		log.Printf("Option --stack is required")
 		os.Exit(-1)
 	}
 
-	hook, _ := github.New()
+	opts := []github.Option{}
+	if secret != "" {
+		opts = append(opts, github.Options.Secret(secret))
+	}
+
+	hook, err := github.New(opts...)
+	if err != nil {
+		log.Fatalf("GitHub hook handler instantiation: %v", err)
+	}
 
 	http.HandleFunc(servePath, func(w http.ResponseWriter, r *http.Request) {
 		payload, err := hook.Parse(r, github.PushEvent)
@@ -51,16 +65,18 @@ func main() {
 
 		switch eventData := payload.(type) {
 		case github.PushPayload:
-			fmt.Printf("Preparing new deployment for stack %q revision %s ...\n", stackName, eventData.After)
-			repoURL := eventData.Repository.SSHURL
 			revision := eventData.After
+			log.Printf("stack %q rev %s: Preparing new deployment...",
+				stackName, revision[:12])
+			repoURL := eventData.Repository.SSHURL
 			action := NewStackDeploymentAction(stackName, workDir, repoURL, revision)
 			go func() {
 				err = action.Run()
 				if err != nil {
 					panic(err)
 				}
-				fmt.Printf("Deployment completed for stack %q revision %s\n", stackName, revision)
+				log.Printf("stack %q rev %s: Deployment update complete.",
+					stackName, revision[:12])
 			}()
 			w.WriteHeader(http.StatusOK)
 			return
@@ -167,8 +183,9 @@ func (action *StackDeploymentAction) deploy() error {
 			composeFilename = "main-stack.yaml"
 		}
 	}
-	fmt.Printf("Excuting deployment for stack %q revision %s with compose file %q ...\n",
-		stackName, action.composeRevision, composeFilename)
+
+	log.Printf("stack %q rev %s: Executing stack update with compose file %q ...",
+		stackName, action.composeRevision[:12], composeFilename)
 	cmd := exec.Command("docker", "stack", "deploy",
 		"--prune", "-c", composeFilename, stackName)
 	cmdEnv := os.Environ()[:]
