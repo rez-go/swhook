@@ -50,6 +50,7 @@ func main() {
 
 	http.HandleFunc(servePath, svc.postStackDeployments)
 
+	log.Printf("Starting HTTP server at %s ...", listenHostPort)
 	err = http.ListenAndServe(listenHostPort, nil)
 	if err != nil {
 		log.Fatalf("Unable to start the HTTP server: %v", err)
@@ -76,7 +77,7 @@ func NewStackDeploymentService(
 		log.Fatalf("GitHub hook handler instantiation: %v", err)
 	}
 
-	log.Printf("Starting service for stack %q, with working directory %q ...",
+	log.Printf("Creating service for stack %q, with working directory %q ...",
 		stackName, workDir)
 
 	return &StackDeploymentService{
