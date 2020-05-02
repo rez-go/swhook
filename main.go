@@ -169,7 +169,7 @@ func (action *StackDeploymentAction) Run() error {
 		defer os.RemoveAll(action.workDir)
 	}
 
-	err = action.pull()
+	err = action.checkout()
 	if err != nil {
 		return err
 	}
@@ -179,9 +179,7 @@ func (action *StackDeploymentAction) Run() error {
 	return err
 }
 
-func (action *StackDeploymentAction) pull() error {
-	cmdEnv := os.Environ()[:]
-
+func (action *StackDeploymentAction) checkout() error {
 	workDirExists := false
 	if action.workDirSpecified {
 		workDirExists = dirExists(filepath.Join(action.workDir, ".git"))
@@ -189,14 +187,12 @@ func (action *StackDeploymentAction) pull() error {
 
 	if !workDirExists {
 		cmd := exec.Command("git", "clone", action.composeRepoURL, action.workDir)
-		cmd.Env = cmdEnv
 		outBytes, err := cmd.CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("git clone: %w\n%s", err, outBytes)
 		}
 	} else {
 		cmd := exec.Command("git", "pull")
-		cmd.Env = cmdEnv
 		cmd.Dir = action.workDir
 		outBytes, err := cmd.CombinedOutput()
 		if err != nil {
@@ -205,7 +201,6 @@ func (action *StackDeploymentAction) pull() error {
 	}
 
 	cmd := exec.Command("git", "reset", "--hard", action.composeRevision)
-	cmd.Env = cmdEnv
 	cmd.Dir = action.workDir
 	outBytes, err := cmd.CombinedOutput()
 	if err != nil {
@@ -238,8 +233,6 @@ func (action *StackDeploymentAction) deploy() error {
 		"--prune",
 		"--compose-file", composeFilename,
 		stackName)
-	cmdEnv := os.Environ()[:]
-	cmd.Env = cmdEnv
 	cmd.Dir = action.workDir
 	outBytes, err := cmd.CombinedOutput()
 	if err != nil {
