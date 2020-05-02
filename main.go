@@ -41,7 +41,10 @@ func main() {
 
 	http.HandleFunc(servePath, svc.postStackDeployments)
 
-	http.ListenAndServe(listenHostPort, nil)
+	err = http.ListenAndServe(listenHostPort, nil)
+	if err != nil {
+		log.Fatalf("Unable to start the HTTP server: %v", err)
+	}
 }
 
 // NewStackDeploymentService returns a new instance of StackDeploymentService.
