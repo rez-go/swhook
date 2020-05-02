@@ -231,7 +231,10 @@ func (action *StackDeploymentAction) deploy() error {
 	log.Printf("stack %q rev %s: Executing stack update with compose file %q ...",
 		stackName, action.composeRevision[:12], composeFilename)
 	cmd := exec.Command("docker", "stack", "deploy",
-		"--prune", "-c", composeFilename, stackName)
+		"--with-registry-auth",
+		"--prune",
+		"--compose-file", composeFilename,
+		stackName)
 	cmdEnv := os.Environ()[:]
 	cmd.Env = cmdEnv
 	cmd.Dir = action.workDir
