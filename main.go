@@ -236,6 +236,11 @@ func (action *StackDeploymentAction) deploy() error {
 		}
 	}
 
+	var cmdEnv []string
+	if action.workDirSpecified {
+		cmdEnv = append(os.Environ(), "SWHOOK_WORKDIR="+action.workDir)
+	}
+
 	log.Printf("stack %q rev %s: Executing stack update with compose file %q ...",
 		stackName, action.composeRevision[:12], composeFilename)
 	cmd := exec.Command("docker", "stack", "deploy",
@@ -244,6 +249,7 @@ func (action *StackDeploymentAction) deploy() error {
 		"--compose-file", composeFilename,
 		stackName)
 	cmd.Dir = action.workDir
+	cmd.Env = cmdEnv
 	outBytes, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("docker stack deploy: %w\n%s", err, outBytes)
