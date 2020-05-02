@@ -14,6 +14,12 @@ import (
 	"gopkg.in/go-playground/webhooks.v5/github"
 )
 
+// These variables will be overriden on build.
+var (
+	revisionID     = "unknown"
+	buildTimestamp = "unknown"
+)
+
 func main() {
 	stackName := ""
 	workDir := ""
@@ -33,6 +39,9 @@ func main() {
 			"requests comming to the hook.")
 
 	flag.Parse()
+
+	fmt.Fprintf(os.Stderr, "swhook revision %s built at %s\n",
+		revisionID, buildTimestamp)
 
 	svc, err := NewStackDeploymentService(stackName, workDir, secret)
 	if err != nil {

@@ -16,14 +16,15 @@ fmt:
 
 linux-amd64:
 	@echo "Building for linux-amd64 ..."
-	@export GOOS=linux
-	@export GOARCH=amd64
 	@docker run --rm \
-		-v $(CURDIR):/workspace \
-		--workdir /workspace \
-		--entrypoint go \
-		$(GOLANG_IMAGE) build -v -o build/swhook-linux-amd64 \
-		.
+			-v $(CURDIR):/workspace \
+			-e GOOS=linux \
+			-e GOARCH=amd64 \
+			--workdir /workspace \
+			--entrypoint go \
+			$(GOLANG_IMAGE) build -v -o build/swhook-linux-amd64 \
+			-ldflags="-s -w -X main.revisionID=$$(git rev-parse HEAD) -X main.buildTimestamp=$$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+			.
 
 # Update all dependencies
 deps-up:

@@ -9,6 +9,6 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.5.1 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
-	gopkg.in/go-playground/webhooks.v5 v5.13.0
+	gopkg.in/go-playground/webhooks.v5 v5.14.0
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 )
