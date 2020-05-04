@@ -22,7 +22,7 @@ linux-amd64:
 			-e GOARCH=amd64 \
 			--workdir /workspace \
 			--entrypoint go \
-			$(GOLANG_IMAGE) build -v -o build/swhook-linux-amd64 \
+			$(GOLANG_IMAGE) build -o build/swhook-linux-amd64 \
 			-ldflags="-s -w -X main.revisionID=$$(git rev-parse HEAD) -X main.buildTimestamp=$$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
 			.
 

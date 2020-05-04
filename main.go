@@ -184,9 +184,22 @@ func (action *StackDeploymentAction) Run() error {
 		return err
 	}
 
-	err = action.deploy()
+	err = action.execHook("pre-deploy")
+	if err != nil {
+		return err
+	}
 
-	return err
+	err = action.deploy()
+	if err != nil {
+		return err
+	}
+
+	err = action.execHook("post-deploy")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (action *StackDeploymentAction) checkout() error {
@@ -215,6 +228,22 @@ func (action *StackDeploymentAction) checkout() error {
 	outBytes, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git reset: %w\n%s", err, outBytes)
+	}
+	return nil
+}
+
+func (action *StackDeploymentAction) execHook(hookName string) error {
+	hookFilename := filepath.Join(action.workDir, hookName)
+	cmd := exec.Command(hookFilename)
+	cmd.Dir = action.workDir
+	outBytes, err := cmd.CombinedOutput()
+	if err != nil {
+		if pathErr, ok := err.(*os.PathError); ok {
+			if pathErr.Op == "fork/exec" && pathErr.Path == hookFilename {
+				return nil
+			}
+		}
+		return fmt.Errorf("exec %s hook: %w\n%s", hookName, err, outBytes)
 	}
 	return nil
 }
