@@ -233,7 +233,7 @@ func (action *StackDeploymentAction) checkout() error {
 }
 
 func (action *StackDeploymentAction) execHook(hookName string) error {
-	hookFilename := filepath.Join(action.workDir, hookName)
+	hookFilename := filepath.Join(action.workDir, ".swhook", "hooks", hookName)
 	cmd := exec.Command(hookFilename)
 	cmd.Dir = action.workDir
 	outBytes, err := cmd.CombinedOutput()
