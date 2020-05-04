@@ -239,7 +239,7 @@ func (action *StackDeploymentAction) execHook(hookName string) error {
 	outBytes, err := cmd.CombinedOutput()
 	if err != nil {
 		if pathErr, ok := err.(*os.PathError); ok {
-			if pathErr.Op == "fork/exec" && pathErr.Path == hookFilename {
+			if pathErr.Op == "fork/exec" && os.IsNotExist(err) && pathErr.Path == hookFilename {
 				return nil
 			}
 		}
